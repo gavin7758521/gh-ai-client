@@ -1,0 +1,27 @@
+{
+  "name": "gh-ai-client",
+  "version": "0.1.0",
+  "description": "AI-assisted GitHub client CLI, starting with starred repository organization.",
+  "type": "module",
+  "bin": {
+    "gh-ai-client": "./bin/gh-ai-client.js"
+  },
+  "scripts": {
+    "check": "node --check bin/gh-ai-client.js && node --check src/*.js",
+    "smoke": "node bin/gh-ai-client.js help && node bin/gh-ai-client.js model list && node bin/gh-ai-client.js collections list && node bin/gh-ai-client.js data path",
+    "test": "npm run check && npm run smoke"
+  },
+  "keywords": [
+    "github",
+    "stars",
+    "ai",
+    "cli"
+  ],
+  "license": "MIT",
+  "optionalDependencies": {
+    "@earendil-works/pi-ai": "^0.80.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
