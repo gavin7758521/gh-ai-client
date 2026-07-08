@@ -111,3 +111,16 @@ gh-ai-client ai review
 ```
 
 Use `ai review` when you want to approve or skip one model-generated action at a time. Use `ai step --apply` when you want to apply only the next pending action from a script.
+
+## Secret scanning
+
+This project uses Gitleaks for local secret checks:
+
+```bash
+npm run secrets
+npm run secrets:dir
+npm run secrets:staged
+npm run precommit
+```
+
+`npm run precommit` scans the staged diff for secrets and then runs the test suite.
