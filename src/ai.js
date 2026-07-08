@@ -1,5 +1,6 @@
 import { readConfig, readJson, writeJson } from "./storage.js";
 import { createPiCredentialStore } from "./pi-auth.js";
+import { applyProxyConfig, proxyEnvFromConfig } from "./proxy.js";
 
 export const MODEL_PRESETS = [
   { provider: "mock", model: "local-rules", note: "No external model; groups by language/topics." },
@@ -10,6 +11,7 @@ export const MODEL_PRESETS = [
 
 export async function suggestCollections({ provider, model, limit = 200 } = {}) {
   const config = await readConfig();
+  await applyProxyConfig(config);
   const selectedProvider = provider || config.ai?.provider || "mock";
   const selectedModel = model || (provider && provider !== config.ai?.provider ? defaultModelForProvider(provider) : config.ai?.model) || defaultModelForProvider(selectedProvider);
   const ai = {
@@ -22,7 +24,7 @@ export async function suggestCollections({ provider, model, limit = 200 } = {}) 
   const suggestions =
     ai.provider === "mock"
       ? mockSuggest(sample)
-      : await modelSuggest(ai, sample, collections);
+      : await modelSuggest(ai, sample, collections, config);
   const payload = {
     provider: ai.provider,
     model: ai.model,
@@ -76,12 +78,12 @@ function classifyRepo(repo) {
   return "Unsorted";
 }
 
-async function modelSuggest(ai, stars, collections) {
+async function modelSuggest(ai, stars, collections, config) {
   if (ai.provider === "openai-compatible") {
     return openAiCompatibleSuggest(stars, collections);
   }
   if (ai.provider === "pi") {
-    return piSuggest(ai, stars, collections);
+    return piSuggest(ai, stars, collections, config);
   }
   throw new Error(`Unsupported AI provider "${ai.provider}". Run: gh-ai-client model list`);
 }
@@ -110,7 +112,7 @@ async function openAiCompatibleSuggest(stars, collections) {
   return parseJsonContent(payload?.choices?.[0]?.message?.content);
 }
 
-async function piSuggest(ai, stars, collections) {
+async function piSuggest(ai, stars, collections, config) {
   let pi;
   try {
     pi = await import("@earendil-works/pi-ai/providers/all");
@@ -133,6 +135,11 @@ async function piSuggest(ai, stars, collections) {
   if (!auth) {
     throw new Error(`pi model ${provider}/${modelId} is not configured. ${piAuthHint(provider)}`);
   }
+  const proxyEnv = proxyEnvFromConfig(config);
+  const options = {
+    reasoning: "low",
+    ...(Object.keys(proxyEnv).length ? { env: proxyEnv } : {})
+  };
   const response = await models.completeSimple(model, {
     systemPrompt: "You organize GitHub starred repositories. Return only strict JSON with collections.",
     messages: [{
@@ -140,9 +147,7 @@ async function piSuggest(ai, stars, collections) {
       content: buildMessages(stars, collections).map((message) => message.content).join("\n\n"),
       timestamp: Date.now()
     }]
-  }, {
-    reasoning: "low"
-  });
+  }, options);
   const text = extractText(response);
   if (!text) {
     throw new Error(`pi model ${provider}/${modelId} returned no text. Try a different model or check provider credentials.`);

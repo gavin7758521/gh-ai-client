@@ -26,6 +26,11 @@ gh-ai-client auth set-token
 gh-ai-client auth status
 gh-ai-client auth clear-token
 
+gh-ai-client proxy set http://127.0.0.1:7890
+gh-ai-client proxy set --http http://127.0.0.1:7890 --https http://127.0.0.1:7890 --no-proxy localhost,127.0.0.1
+gh-ai-client proxy status
+gh-ai-client proxy clear
+
 gh-ai-client codex login
 gh-ai-client codex status
 gh-ai-client codex logout
@@ -81,6 +86,18 @@ Data is stored in:
 
 Set `GH_AI_CLIENT_HOME` to use a different directory for tests.
 
+## Proxy
+
+If GitHub, OpenAI, or pi requests need a local proxy, configure it before login or sync:
+
+```bash
+gh-ai-client proxy set http://127.0.0.1:7890
+gh-ai-client proxy status
+gh-ai-client codex login
+```
+
+The short `proxy set <url>` form sets both `HTTP_PROXY` and `HTTPS_PROXY`. `proxy status` redacts credentials in proxy URLs, but the local config file stores the proxy URL you enter.
+
 ## GitHub Star API boundary
 
 GitHub REST supports listing, starring, unstarring, and checking starred repositories. GitHub's web Star Lists do not have a clearly documented stable write API in the REST starring docs, so this CLI starts with local collections.
@@ -114,6 +131,7 @@ gh-ai-client ai suggest
 ## Suggested workflow
 
 ```bash
+gh-ai-client proxy set http://127.0.0.1:7890
 gh-ai-client auth set-token
 gh-ai-client stars sync
 gh-ai-client codex login

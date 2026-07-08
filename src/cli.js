@@ -5,6 +5,7 @@ import { applySuggestions, readCollections, writeCollections, addRepoToCollectio
 import { listStarredRepos, starRepo, tokenFromConfig, unstarRepo, validateToken } from "./github.js";
 import { MODEL_PRESETS, listCodexModels, listPiModels, recommendedCodexModel, suggestCollections } from "./ai.js";
 import { CODEX_PROVIDER_ID, createPiCredentialStore, readPiCredential } from "./pi-auth.js";
+import { applyProxyConfig, normalizeProxyConfig, proxyStatusLines } from "./proxy.js";
 import { DATA_DIR, appendHistory, dataPath, readConfig, readJson, removeData, writeConfig, writeJson } from "./storage.js";
 
 export async function main(argv) {
@@ -15,6 +16,7 @@ export async function main(argv) {
     return;
   }
   if (group === "auth") return authCommand(command, rest);
+  if (group === "proxy") return proxyCommand(command, rest);
   if (group === "model") return modelCommand(command, rest);
   if (group === "codex") return codexCommand(command, rest);
   if (group === "stars") return starsCommand(command, rest);
@@ -27,6 +29,7 @@ export async function main(argv) {
 function printHelp(topic = "") {
   const sections = {
     auth: "auth set-token | auth status | auth clear-token",
+    proxy: "proxy set <url> | proxy set --http <url> [--https <url>] [--all <url>] [--no-proxy list] | proxy status | proxy clear",
     codex: "codex login | codex status | codex logout",
     model: "model list [pi [provider]|codex|local|--all] | model use <provider[:model]|codex> | model current | model test",
     stars: "stars sync [--max-pages N] | stars list [--limit N] | stars search <keyword> | stars star <owner/repo> | stars unstar <owner/repo>",
@@ -41,8 +44,9 @@ function printHelp(topic = "") {
   console.log(`gh-ai-client
 
 Usage:
-  gh-ai-client help [auth|codex|model|stars|collections|ai|data]
+  gh-ai-client help [auth|proxy|codex|model|stars|collections|ai|data]
   gh-ai-client auth set-token
+  gh-ai-client proxy set http://127.0.0.1:7890
   gh-ai-client codex login
   gh-ai-client model use <provider[:model]|codex>
   gh-ai-client stars sync
@@ -52,6 +56,7 @@ Usage:
 
 Commands:
   ${sections.auth}
+  ${sections.proxy}
   ${sections.codex}
   ${sections.model}
   ${sections.stars}
@@ -65,6 +70,7 @@ Data:
 
 async function authCommand(command, args) {
   const config = await readConfig();
+  await applyProxyConfig(config);
   if (command === "set-token") {
     const token = args[0] || await promptSecret("GitHub token: ");
     const user = await validateToken(token);
@@ -92,7 +98,31 @@ async function authCommand(command, args) {
   printHelp("auth");
 }
 
+async function proxyCommand(command, args) {
+  const config = await readConfig();
+  if (command === "set") {
+    config.proxy = parseProxyArgs(args);
+    await writeConfig(config);
+    console.log("Saved proxy configuration.");
+    for (const line of proxyStatusLines(config).slice(1)) console.log(line);
+    return;
+  }
+  if (command === "status") {
+    for (const line of proxyStatusLines(config)) console.log(line);
+    return;
+  }
+  if (command === "clear") {
+    delete config.proxy;
+    await writeConfig(config);
+    console.log("Cleared proxy configuration.");
+    return;
+  }
+  printHelp("proxy");
+}
+
 async function codexCommand(command) {
+  const config = await readConfig();
+  await applyProxyConfig(config);
   if (command === "login") {
     const store = createPiCredentialStore();
     const models = await createPiModelsWithStore(store);
@@ -106,7 +136,6 @@ async function codexCommand(command) {
       });
       await store.modify(CODEX_PROVIDER_ID, async () => credential);
       const model = await recommendedCodexModel();
-      const config = await readConfig();
       config.ai = { provider: "pi", model: `${model.provider}/${model.id}` };
       await writeConfig(config);
       console.log(`Saved Codex login and selected ${config.ai.model}.`);
@@ -117,7 +146,6 @@ async function codexCommand(command) {
   }
   if (command === "status") {
     const credential = await readPiCredential(CODEX_PROVIDER_ID);
-    const config = await readConfig();
     if (!credential) {
       console.log("Codex login is not configured. Run: gh-ai-client codex login");
       console.log(`Current model: ${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
@@ -205,6 +233,7 @@ async function modelCommand(command, args) {
 
 async function starsCommand(command, args) {
   const config = await readConfig();
+  await applyProxyConfig(config);
   const token = tokenFromConfig(config);
   if (command === "sync") {
     const maxPages = Number(readOption(args, "--max-pages") || 100);
@@ -403,6 +432,7 @@ async function dataCommand(command) {
     }
     console.log(`Data dir: ${DATA_DIR}`);
     console.log(`GitHub token: ${tokenFromConfig(config) ? "configured" : "missing"}`);
+    console.log(proxyStatusLines(config).join("; "));
     console.log(`AI model: ${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
     console.log(`Stars: ${(stars.stars || []).length}`);
     console.log(`Collections: ${(collections.collections || []).length}`);
@@ -448,6 +478,22 @@ function collectionRepoArgs(args) {
   const name = args.slice(0, -1).join(" ");
   if (!name || !repo) throw new Error("Usage: gh-ai-client collections add <collection name> <owner/repo>");
   return { name, repo };
+}
+
+function parseProxyArgs(args) {
+  if (!args.length) throw new Error("Usage: gh-ai-client proxy set <url>");
+  if (!args[0].startsWith("--")) {
+    const url = args[0];
+    return normalizeProxyConfig({ http: url, https: url });
+  }
+  const proxy = normalizeProxyConfig({
+    http: readOption(args, "--http"),
+    https: readOption(args, "--https"),
+    all: readOption(args, "--all"),
+    noProxy: readOption(args, "--no-proxy")
+  });
+  if (!Object.keys(proxy).length) throw new Error("Usage: gh-ai-client proxy set --http <url> [--https <url>] [--all <url>] [--no-proxy list]");
+  return proxy;
 }
 
 function defaultModelForProvider(provider) {
