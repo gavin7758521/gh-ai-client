@@ -4,6 +4,7 @@
   "description": "AI-assisted GitHub client CLI, starting with starred repository organization.",
   "type": "module",
   "bin": {
+    "ghac": "./bin/gh-ai-client.js",
     "gh-ai-client": "./bin/gh-ai-client.js"
   },
   "scripts": {

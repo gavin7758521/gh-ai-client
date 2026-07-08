@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export const DATA_DIR = process.env.GH_AI_CLIENT_HOME || join(homedir(), ".gh-ai-client");
+export const DATA_DIR = process.env.GHAC_HOME || process.env.GH_AI_CLIENT_HOME || join(homedir(), ".ghac");
 
 const paths = {
   config: join(DATA_DIR, "config.json"),

@@ -76,7 +76,7 @@ function splitRepo(fullName) {
 }
 
 async function githubRequest(path, { token, method = "GET", accept = "application/vnd.github+json", expectEmpty = false } = {}) {
-  if (!token) throw new Error("GitHub token is required. Run: gh-ai-client auth set-token");
+  if (!token) throw new Error("GitHub token is required. Run: ghac auth set-token");
   const response = await fetch(`${GITHUB_API}${path}`, {
     method,
     headers: {

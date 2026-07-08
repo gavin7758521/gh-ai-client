@@ -23,7 +23,7 @@ export async function main(argv) {
   if (group === "collections") return collectionsCommand(command, rest);
   if (group === "ai") return aiCommand(command, rest);
   if (group === "data") return dataCommand(command, rest);
-  throw new Error(`Unknown command "${group}". Run: gh-ai-client help`);
+  throw new Error(`Unknown command "${group}". Run: ghac help`);
 }
 
 function printHelp(topic = "") {
@@ -38,21 +38,21 @@ function printHelp(topic = "") {
     data: "data path | data doctor"
   };
   if (topic && sections[topic]) {
-    console.log(`Usage: gh-ai-client ${sections[topic]}`);
+    console.log(`Usage: ghac ${sections[topic]}`);
     return;
   }
-  console.log(`gh-ai-client
+  console.log(`ghac
 
 Usage:
-  gh-ai-client help [auth|proxy|codex|model|stars|collections|ai|data]
-  gh-ai-client auth set-token
-  gh-ai-client proxy set http://127.0.0.1:7890
-  gh-ai-client codex login
-  gh-ai-client model use <provider[:model]|codex>
-  gh-ai-client stars sync
-  gh-ai-client ai suggest
-  gh-ai-client ai step
-  gh-ai-client ai apply
+  ghac help [auth|proxy|codex|model|stars|collections|ai|data]
+  ghac auth set-token
+  ghac proxy set http://127.0.0.1:7890
+  ghac codex login
+  ghac model use <provider[:model]|codex>
+  ghac stars sync
+  ghac ai suggest
+  ghac ai step
+  ghac ai apply
 
 Commands:
   ${sections.auth}
@@ -147,7 +147,7 @@ async function codexCommand(command) {
   if (command === "status") {
     const credential = await readPiCredential(CODEX_PROVIDER_ID);
     if (!credential) {
-      console.log("Codex login is not configured. Run: gh-ai-client codex login");
+      console.log("Codex login is not configured. Run: ghac codex login");
       console.log(`Current model: ${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
       return;
     }
@@ -200,16 +200,16 @@ async function modelCommand(command, args) {
   }
   if (command === "use") {
     const value = args[0];
-    if (!value) throw new Error("Usage: gh-ai-client model use <provider[:model]|codex>");
+    if (!value) throw new Error("Usage: ghac model use <provider[:model]|codex>");
     if (isCodexAlias(value)) {
       const model = await recommendedCodexModel();
       config.ai = { provider: "pi", model: `${model.provider}/${model.id}` };
       await writeConfig(config);
       console.log(`Using Codex model through pi: ${config.ai.model}.`);
       if (model.provider === CODEX_PROVIDER_ID && !await readPiCredential(CODEX_PROVIDER_ID)) {
-        console.log("Codex login is not configured. Run: gh-ai-client codex login");
+        console.log("Codex login is not configured. Run: ghac codex login");
       } else if (model.provider === "openai" && !process.env.OPENAI_API_KEY) {
-        console.log("OpenAI auth is not configured in this shell. Set OPENAI_API_KEY before running: gh-ai-client ai suggest");
+        console.log("OpenAI auth is not configured in this shell. Set OPENAI_API_KEY before running: ghac ai suggest");
       }
       return;
     }
@@ -250,7 +250,7 @@ async function starsCommand(command, args) {
   }
   if (command === "search") {
     const keyword = args.join(" ").trim().toLowerCase();
-    if (!keyword) throw new Error("Usage: gh-ai-client stars search <keyword>");
+    if (!keyword) throw new Error("Usage: ghac stars search <keyword>");
     const state = await readJson("stars", { stars: [] });
     printRepos(state.stars.filter((repo) => repoMatches(repo, keyword)).slice(0, 100));
     return;
@@ -321,7 +321,7 @@ async function collectionsCommand(command, args) {
   }
   if (command === "import") {
     const file = args[0];
-    if (!file) throw new Error("Usage: gh-ai-client collections import <file> [--replace]");
+    if (!file) throw new Error("Usage: ghac collections import <file> [--replace]");
     const incoming = normalizeCollectionState(JSON.parse(await readFile(file, "utf8")));
     const next = args.includes("--replace") ? incoming : mergeCollectionStates(state, incoming);
     await writeCollections(next);
@@ -367,7 +367,7 @@ async function aiCommand(command, args) {
     const state = await readCollections();
     const action = firstSuggestedAction(suggestions, state);
     if (!action) {
-      console.log("No unapplied suggestion action available. Run: gh-ai-client ai suggest");
+      console.log("No unapplied suggestion action available. Run: ghac ai suggest");
       return;
     }
     console.log(JSON.stringify(action, null, 2));
@@ -382,7 +382,7 @@ async function aiCommand(command, args) {
     const state = await readCollections();
     const action = firstSuggestedAction(suggestions, state);
     if (!action) {
-      console.log("No unapplied suggestion action available. Run: gh-ai-client ai suggest");
+      console.log("No unapplied suggestion action available. Run: ghac ai suggest");
       return;
     }
     removeSuggestedAssignment(suggestions, action);
@@ -476,12 +476,12 @@ function findCollection(state, name) {
 function collectionRepoArgs(args) {
   const repo = args[args.length - 1];
   const name = args.slice(0, -1).join(" ");
-  if (!name || !repo) throw new Error("Usage: gh-ai-client collections add <collection name> <owner/repo>");
+  if (!name || !repo) throw new Error("Usage: ghac collections add <collection name> <owner/repo>");
   return { name, repo };
 }
 
 function parseProxyArgs(args) {
-  if (!args.length) throw new Error("Usage: gh-ai-client proxy set <url>");
+  if (!args.length) throw new Error("Usage: ghac proxy set <url>");
   if (!args[0].startsWith("--")) {
     const url = args[0];
     return normalizeProxyConfig({ http: url, https: url });
@@ -492,7 +492,7 @@ function parseProxyArgs(args) {
     all: readOption(args, "--all"),
     noProxy: readOption(args, "--no-proxy")
   });
-  if (!Object.keys(proxy).length) throw new Error("Usage: gh-ai-client proxy set --http <url> [--https <url>] [--all <url>] [--no-proxy list]");
+  if (!Object.keys(proxy).length) throw new Error("Usage: ghac proxy set --http <url> [--https <url>] [--all <url>] [--no-proxy list]");
   return proxy;
 }
 
@@ -599,7 +599,7 @@ async function reviewSuggestions() {
       const state = await readCollections();
       const action = firstSuggestedAction(suggestions, state);
       if (!action) {
-        console.log("No unapplied suggestion action available. Run: gh-ai-client ai suggest");
+        console.log("No unapplied suggestion action available. Run: ghac ai suggest");
         return;
       }
       console.log(`\n${action.repo} -> ${action.collection}`);

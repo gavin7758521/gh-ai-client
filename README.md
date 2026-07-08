@@ -10,65 +10,65 @@ npm install
 npm link
 ```
 
-You can also run without linking:
+After linking, use the installed command:
 
 ```bash
-node bin/gh-ai-client.js help
+ghac help
 ```
 
 ## Commands
 
 ```bash
-gh-ai-client help
-gh-ai-client help stars
+ghac help
+ghac help stars
 
-gh-ai-client auth set-token
-gh-ai-client auth status
-gh-ai-client auth clear-token
+ghac auth set-token
+ghac auth status
+ghac auth clear-token
 
-gh-ai-client proxy set http://127.0.0.1:7890
-gh-ai-client proxy set --http http://127.0.0.1:7890 --https http://127.0.0.1:7890 --no-proxy localhost,127.0.0.1
-gh-ai-client proxy status
-gh-ai-client proxy clear
+ghac proxy set http://127.0.0.1:7890
+ghac proxy set --http http://127.0.0.1:7890 --https http://127.0.0.1:7890 --no-proxy localhost,127.0.0.1
+ghac proxy status
+ghac proxy clear
 
-gh-ai-client codex login
-gh-ai-client codex status
-gh-ai-client codex logout
+ghac codex login
+ghac codex status
+ghac codex logout
 
-gh-ai-client model list
-gh-ai-client model list codex
-gh-ai-client model list pi openai
-gh-ai-client model list local
-gh-ai-client model use codex
-gh-ai-client model use pi:openai/gpt-4o-mini
-gh-ai-client model use openai-compatible:env
-gh-ai-client model current
-gh-ai-client model test
+ghac model list
+ghac model list codex
+ghac model list pi openai
+ghac model list local
+ghac model use codex
+ghac model use pi:openai/gpt-4o-mini
+ghac model use openai-compatible:env
+ghac model current
+ghac model test
 
-gh-ai-client stars sync
-gh-ai-client stars list --limit 20
-gh-ai-client stars search agent
+ghac stars sync
+ghac stars list --limit 20
+ghac stars search agent
 
-gh-ai-client collections list
-gh-ai-client collections show AI
-gh-ai-client collections create AI
-gh-ai-client collections add AI owner/repo
-gh-ai-client collections remove AI owner/repo
-gh-ai-client collections export collections.json
-gh-ai-client collections import collections.json
-gh-ai-client collections import collections.json --replace
+ghac collections list
+ghac collections show AI
+ghac collections create AI
+ghac collections add AI owner/repo
+ghac collections remove AI owner/repo
+ghac collections export collections.json
+ghac collections import collections.json
+ghac collections import collections.json --replace
 
-gh-ai-client ai suggest
-gh-ai-client ai status
-gh-ai-client ai step
-gh-ai-client ai step --apply
-gh-ai-client ai skip
-gh-ai-client ai review
-gh-ai-client ai apply
-gh-ai-client ai clear
+ghac ai suggest
+ghac ai status
+ghac ai step
+ghac ai step --apply
+ghac ai skip
+ghac ai review
+ghac ai apply
+ghac ai clear
 
-gh-ai-client data path
-gh-ai-client data doctor
+ghac data path
+ghac data doctor
 ```
 
 ## Data
@@ -76,7 +76,7 @@ gh-ai-client data doctor
 Data is stored in:
 
 ```text
-~/.gh-ai-client/
+~/.ghac/
   config.json
   stars.json
   collections.json
@@ -84,16 +84,16 @@ Data is stored in:
   history.jsonl
 ```
 
-Set `GH_AI_CLIENT_HOME` to use a different directory for tests.
+Set `GHAC_HOME` to use a different directory for tests. `GH_AI_CLIENT_HOME` is still accepted as a legacy override.
 
 ## Proxy
 
 If GitHub, OpenAI, or pi requests need a local proxy, configure it before login or sync:
 
 ```bash
-gh-ai-client proxy set http://127.0.0.1:7890
-gh-ai-client proxy status
-gh-ai-client codex login
+ghac proxy set http://127.0.0.1:7890
+ghac proxy status
+ghac codex login
 ```
 
 The short `proxy set <url>` form sets both `HTTP_PROXY` and `HTTPS_PROXY`. `proxy status` redacts credentials in proxy URLs, but the local config file stores the proxy URL you enter.
@@ -104,7 +104,7 @@ GitHub REST supports listing, starring, unstarring, and checking starred reposit
 
 ## AI providers
 
-`mock` works offline and groups by repo metadata. It is hidden from the default model list; use `gh-ai-client model list local` if you need the offline fallback.
+`mock` works offline and groups by repo metadata. It is hidden from the default model list; use `ghac model list local` if you need the offline fallback.
 
 `openai-compatible` uses these environment variables:
 
@@ -117,27 +117,27 @@ OPENAI_COMPATIBLE_MODEL=...
 `pi` uses `@earendil-works/pi-ai`:
 
 ```bash
-gh-ai-client codex login
-gh-ai-client model list pi
-gh-ai-client model list pi anthropic --limit 10
-gh-ai-client model list codex
-gh-ai-client model use codex
-gh-ai-client model use pi:openai/gpt-4o-mini
-gh-ai-client ai suggest
+ghac codex login
+ghac model list pi
+ghac model list pi anthropic --limit 10
+ghac model list codex
+ghac model use codex
+ghac model use pi:openai/gpt-4o-mini
+ghac ai suggest
 ```
 
-`codex login` uses pi's OpenAI Codex OAuth flow and stores credentials locally in `~/.gh-ai-client/pi-auth.json`. `model use codex` selects the recommended OpenAI Codex model exposed by pi, such as `openai-codex/gpt-5.3-codex-spark` when available.
+`codex login` uses pi's OpenAI Codex OAuth flow and stores credentials locally in `~/.ghac/pi-auth.json`. `model use codex` selects the recommended OpenAI Codex model exposed by pi, such as `openai-codex/gpt-5.3-codex-spark` when available.
 
 ## Suggested workflow
 
 ```bash
-gh-ai-client proxy set http://127.0.0.1:7890
-gh-ai-client auth set-token
-gh-ai-client stars sync
-gh-ai-client codex login
-gh-ai-client model use codex
-gh-ai-client ai suggest
-gh-ai-client ai review
+ghac proxy set http://127.0.0.1:7890
+ghac auth set-token
+ghac stars sync
+ghac codex login
+ghac model use codex
+ghac ai suggest
+ghac ai review
 ```
 
 Use `ai review` when you want to approve or skip one model-generated action at a time. Use `ai step --apply` when you want to apply only the next pending action from a script.

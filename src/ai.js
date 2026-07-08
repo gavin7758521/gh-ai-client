@@ -85,7 +85,7 @@ async function modelSuggest(ai, stars, collections, config) {
   if (ai.provider === "pi") {
     return piSuggest(ai, stars, collections, config);
   }
-  throw new Error(`Unsupported AI provider "${ai.provider}". Run: gh-ai-client model list`);
+  throw new Error(`Unsupported AI provider "${ai.provider}". Run: ghac model list`);
 }
 
 async function openAiCompatibleSuggest(stars, collections) {
@@ -123,7 +123,7 @@ async function piSuggest(ai, stars, collections, config) {
   const [provider, ...modelParts] = modelRef.split("/");
   const modelId = modelParts.join("/");
   if (!provider || !modelId) {
-    throw new Error("pi model must be provider/model, for example: gh-ai-client model use pi:openai/gpt-4o-mini");
+    throw new Error("pi model must be provider/model, for example: ghac model use pi:openai/gpt-4o-mini");
   }
   const models = pi.builtinModels({ credentials: createPiCredentialStore() });
   const model = models.getModel(provider, modelId);
@@ -208,7 +208,7 @@ function codexModelScore(id) {
 }
 
 function piAuthHint(provider) {
-  if (provider === "openai-codex") return "Run: gh-ai-client codex login.";
+  if (provider === "openai-codex") return "Run: ghac codex login.";
   if (provider === "openai") return "Set OPENAI_API_KEY in this shell.";
   if (provider === "anthropic") return "Set ANTHROPIC_API_KEY in this shell.";
   if (provider === "google") return "Set GEMINI_API_KEY or GOOGLE_API_KEY in this shell.";
