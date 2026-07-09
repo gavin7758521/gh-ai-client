@@ -3,6 +3,7 @@ import { stdin as input, stdout as output } from "node:process";
 import { MODEL_PRESETS, listCodexModels, listPiModels, planGitHubActions, recommendedCodexModel, testConfiguredModel } from "./ai.js";
 import { listStarredRepos, starRepo, tokenFromConfig, unstarRepo, validateToken } from "./github.js";
 import { CODEX_PROVIDER_ID, createPiCredentialStore, readPiCredential } from "./pi-auth.js";
+import { runMcpServer } from "./mcp-server.js";
 import { applyProxyConfig, normalizeProxyConfig, proxyStatusLines } from "./proxy.js";
 import { addRepoToGitHubList, createGitHubList, getGitHubList, listGitHubLists, removeRepoFromGitHubList } from "./star-lists.js";
 import { DATA_DIR, dataPath, readConfig, writeConfig } from "./storage.js";
@@ -21,6 +22,7 @@ export async function main(argv) {
   if (group === "stars") return starsCommand(command, rest);
   if (group === "lists") return listsCommand(command, rest);
   if (group === "ai") return aiCommand(command, rest);
+  if (group === "mcp") return mcpCommand(command);
   if (group === "data") return dataCommand(command);
   throw new Error(`Unknown command "${group}". Run: gham help`);
 }
@@ -34,6 +36,7 @@ function printHelp(topic = "") {
     stars: "stars list [--limit N] [--max-pages N] | stars search <keyword> [--max-pages N] | stars star <owner/repo> | stars unstar <owner/repo>",
     lists: "lists list | lists show <name> | lists create <name> [--description text] [--private] | lists add <name> <owner/repo> [--create] | lists remove <name> <owner/repo>",
     ai: "ai | ai plan <prompt>",
+    mcp: "mcp serve",
     data: "data path | data doctor"
   };
   if (topic && sections[topic]) {
@@ -43,7 +46,7 @@ function printHelp(topic = "") {
   console.log(`gham
 
 Usage:
-  gham help [auth|proxy|codex|model|stars|lists|ai|data]
+  gham help [auth|proxy|codex|model|stars|lists|ai|mcp|data]
   gham auth set-token
   gham proxy set http://127.0.0.1:7890
   gham codex login
@@ -51,6 +54,7 @@ Usage:
   gham stars list
   gham lists list
   gham ai
+  gham mcp serve
 
 Commands:
   ${sections.auth}
@@ -60,6 +64,7 @@ Commands:
   ${sections.stars}
   ${sections.lists}
   ${sections.ai}
+  ${sections.mcp}
   ${sections.data}
 
 Data:
@@ -324,6 +329,14 @@ async function aiCommand(command, args) {
     return;
   }
   printHelp("ai");
+}
+
+async function mcpCommand(command) {
+  if (command === "serve") {
+    await runMcpServer();
+    return;
+  }
+  printHelp("mcp");
 }
 
 async function startAiRepl() {

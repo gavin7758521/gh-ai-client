@@ -4,10 +4,11 @@
   "description": "AI-assisted GitHub manager for CLI and agent workflows.",
   "type": "module",
   "bin": {
-    "gham": "./bin/gham.js"
+    "gham": "./bin/gham.js",
+    "gham-mcp": "./bin/gham-mcp.js"
   },
   "scripts": {
-    "check": "node --check bin/gham.js && node --check src/*.js",
+    "check": "node --check bin/*.js && node --check src/*.js",
     "smoke": "GHAM_HOME=/tmp/gham-smoke node bin/gham.js help && GHAM_HOME=/tmp/gham-smoke node bin/gham.js model list && GHAM_HOME=/tmp/gham-smoke node bin/gham.js data path",
     "test": "npm run check && npm run smoke",
     "secrets": "gitleaks git --redact --no-banner",

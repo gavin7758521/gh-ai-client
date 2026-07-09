@@ -58,6 +58,9 @@ gham lists remove "AI Tools" openai/codex
 gham ai
 gham ai plan "帮我把 AI agent 相关仓库整理到 AI-智能体"
 
+gham mcp serve
+gham-mcp
+
 gham data path
 gham data doctor
 ```
@@ -116,6 +119,41 @@ Inside the shell, natural language reads live GitHub data, asks the configured m
 Use `/context` to inspect the current in-memory state, `/refresh` to reload GitHub online data, and `/forget` to clear conversation memory and the pending plan.
 
 Command-line `gham ai plan ...` prints a plan but does not save it. Use `gham ai` when you want to apply a plan.
+
+## MCP Server
+
+`github-ai-manager` includes a stdio MCP server for Codex, Claude Code, and other MCP clients:
+
+```bash
+gham-mcp
+gham mcp serve
+```
+
+Add it to Codex:
+
+```bash
+codex mcp add github-ai-manager -- gham-mcp
+```
+
+Add it to Claude Code:
+
+```bash
+claude mcp add github-ai-manager -- gham-mcp
+```
+
+The MCP tools use the same `~/.gham/config.json` GitHub token and proxy configuration as the CLI. They read GitHub online and write directly to GitHub only through explicit structured tools:
+
+```text
+stars_list
+stars_search
+star_repo
+unstar_repo
+lists_list
+lists_show
+lists_create
+lists_add_repo
+lists_remove_repo
+```
 
 ## AI Providers
 
