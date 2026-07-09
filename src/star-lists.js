@@ -53,12 +53,8 @@ const VIEWER_LISTS_QUERY = `
           ${LIST_FRAGMENT}
           items(first: 100) {
             totalCount
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
             nodes {
-              ${REPO_ITEM_FRAGMENT}
+              __typename
             }
           }
         }
@@ -116,7 +112,7 @@ const UPDATE_ITEM_LISTS_MUTATION = `
   }
 `;
 
-export async function syncGitHubLists(token) {
+export async function listGitHubLists(token, { includeItems = true } = {}) {
   const lists = [];
   let viewer = null;
   let after = null;
@@ -126,13 +122,14 @@ export async function syncGitHubLists(token) {
     const connection = data.viewer.lists;
     for (const node of connection.nodes || []) {
       const list = normalizeList(node);
-      list.repos = normalizeRepoItems(node.items?.nodes || []);
-      list.total_count = node.items?.totalCount || list.repos.length;
-      let itemsPageInfo = node.items?.pageInfo || {};
-      while (itemsPageInfo.hasNextPage && itemsPageInfo.endCursor) {
-        const page = await listItemsPage(token, node.id, itemsPageInfo.endCursor);
+      list.total_count = node.items?.totalCount || node.items?.nodes?.length || 0;
+      if (includeItems && list.total_count > 0) {
+        let page = await listItemsPage(token, node.id, null);
         list.repos.push(...normalizeRepoItems(page.nodes || []));
-        itemsPageInfo = page.pageInfo || {};
+        while (page.pageInfo?.hasNextPage && page.pageInfo?.endCursor) {
+          page = await listItemsPage(token, node.id, page.pageInfo.endCursor);
+          list.repos.push(...normalizeRepoItems(page.nodes || []));
+        }
       }
       lists.push(list);
     }
@@ -140,7 +137,6 @@ export async function syncGitHubLists(token) {
     if (!connection.pageInfo?.hasNextPage) break;
   } while (after);
   return {
-    synced_at: new Date().toISOString(),
     viewer: viewer ? { login: viewer.login } : null,
     lists
   };
@@ -204,11 +200,26 @@ export async function removeRepoFromGitHubList(token, listName, fullName) {
 }
 
 export async function findGitHubList(token, name) {
-  const state = await syncGitHubLists(token);
+  const state = await listGitHubLists(token, { includeItems: true });
   return {
     state,
     list: findListInState(state, name)
   };
+}
+
+export async function getGitHubList(token, name) {
+  const state = await listGitHubLists(token, { includeItems: false });
+  const list = findListInState(state, name);
+  if (!list) return null;
+  if (list.total_count > 0) {
+    let page = await listItemsPage(token, list.id, null);
+    list.repos.push(...normalizeRepoItems(page.nodes || []));
+    while (page.pageInfo?.hasNextPage && page.pageInfo?.endCursor) {
+      page = await listItemsPage(token, list.id, page.pageInfo.endCursor);
+      list.repos.push(...normalizeRepoItems(page.nodes || []));
+    }
+  }
+  return list;
 }
 
 export function findListInState(state, name) {
@@ -225,11 +236,11 @@ function listIdsForRepo(lists, fullName) {
 }
 
 async function getTargetList(token, listName, { create }) {
-  let state = await syncGitHubLists(token);
+  let state = await listGitHubLists(token, { includeItems: true });
   let list = findListInState(state, listName);
   if (!list && create) {
     await createGitHubList(token, { name: listName });
-    state = await syncGitHubLists(token);
+    state = await listGitHubLists(token, { includeItems: true });
     list = findListInState(state, listName);
   }
   if (!list) throw new Error(`GitHub list "${listName}" does not exist. Run: ghac lists create "${listName}"`);

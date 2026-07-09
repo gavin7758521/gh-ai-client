@@ -9,7 +9,7 @@
   },
   "scripts": {
     "check": "node --check bin/gh-ai-client.js && node --check src/*.js",
-    "smoke": "GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js help && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js model list && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js lists list --local && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js collections list && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js data path",
+    "smoke": "GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js help && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js model list && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js data path",
     "test": "npm run check && npm run smoke",
     "secrets": "gitleaks git --redact --no-banner",
     "secrets:dir": "gitleaks dir --redact --no-banner .",
