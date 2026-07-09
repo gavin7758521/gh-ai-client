@@ -7,7 +7,9 @@ export const DATA_DIR = process.env.GHAC_HOME || process.env.GH_AI_CLIENT_HOME |
 const paths = {
   config: join(DATA_DIR, "config.json"),
   stars: join(DATA_DIR, "stars.json"),
+  lists: join(DATA_DIR, "lists.json"),
   collections: join(DATA_DIR, "collections.json"),
+  plan: join(DATA_DIR, "ai-plan.json"),
   suggestions: join(DATA_DIR, "suggestions.json"),
   history: join(DATA_DIR, "history.jsonl")
 };
@@ -39,8 +41,8 @@ export async function readConfig() {
   return readJson("config", {
     github: {},
     ai: {
-      provider: "mock",
-      model: "local-rules"
+      provider: "",
+      model: ""
     }
   });
 }

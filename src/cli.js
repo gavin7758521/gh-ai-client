@@ -3,9 +3,10 @@ import { stdin as input, stdout as output } from "node:process";
 import { readFile, writeFile } from "node:fs/promises";
 import { applySuggestions, readCollections, writeCollections, addRepoToCollection, removeRepoFromCollection, ensureCollection } from "./collections.js";
 import { listStarredRepos, starRepo, tokenFromConfig, unstarRepo, validateToken } from "./github.js";
-import { MODEL_PRESETS, listCodexModels, listPiModels, recommendedCodexModel, suggestCollections } from "./ai.js";
+import { MODEL_PRESETS, listCodexModels, listPiModels, planGitHubActions, recommendedCodexModel, suggestCollections } from "./ai.js";
 import { CODEX_PROVIDER_ID, createPiCredentialStore, readPiCredential } from "./pi-auth.js";
 import { applyProxyConfig, normalizeProxyConfig, proxyStatusLines } from "./proxy.js";
+import { addRepoToGitHubList, createGitHubList, removeRepoFromGitHubList, syncGitHubLists } from "./star-lists.js";
 import { DATA_DIR, appendHistory, dataPath, readConfig, readJson, removeData, writeConfig, writeJson } from "./storage.js";
 
 export async function main(argv) {
@@ -20,6 +21,7 @@ export async function main(argv) {
   if (group === "model") return modelCommand(command, rest);
   if (group === "codex") return codexCommand(command, rest);
   if (group === "stars") return starsCommand(command, rest);
+  if (group === "lists") return listsCommand(command, rest);
   if (group === "collections") return collectionsCommand(command, rest);
   if (group === "ai") return aiCommand(command, rest);
   if (group === "data") return dataCommand(command, rest);
@@ -33,8 +35,9 @@ function printHelp(topic = "") {
     codex: "codex login | codex status | codex logout",
     model: "model list [pi [provider]|codex|local|--all] | model use <provider[:model]|codex> | model current | model test",
     stars: "stars sync [--max-pages N] | stars list [--limit N] | stars search <keyword> | stars star <owner/repo> | stars unstar <owner/repo>",
+    lists: "lists sync | lists list | lists show <name> | lists create <name> [--description text] [--private] | lists add <name> <owner/repo> [--create] | lists remove <name> <owner/repo>",
     collections: "collections list | collections show <name> | collections create <name> | collections add <name> <owner/repo> | collections remove <name> <owner/repo> | collections export [file] | collections import <file> [--replace]",
-    ai: "ai suggest [--provider pi|openai-compatible] [--model name] [--limit N] | ai status | ai step [--apply] | ai skip | ai review | ai apply | ai clear",
+    ai: "ai | ai plan <prompt> | ai apply-plan | ai suggest [--provider pi|openai-compatible] [--model name] [--limit N] | ai status | ai step [--apply] | ai skip | ai review | ai apply | ai clear",
     data: "data path | data doctor"
   };
   if (topic && sections[topic]) {
@@ -44,15 +47,14 @@ function printHelp(topic = "") {
   console.log(`ghac
 
 Usage:
-  ghac help [auth|proxy|codex|model|stars|collections|ai|data]
+  ghac help [auth|proxy|codex|model|stars|lists|collections|ai|data]
   ghac auth set-token
   ghac proxy set http://127.0.0.1:7890
   ghac codex login
   ghac model use <provider[:model]|codex>
   ghac stars sync
-  ghac ai suggest
-  ghac ai step
-  ghac ai apply
+  ghac lists sync
+  ghac ai
 
 Commands:
   ${sections.auth}
@@ -60,6 +62,7 @@ Commands:
   ${sections.codex}
   ${sections.model}
   ${sections.stars}
+  ${sections.lists}
   ${sections.collections}
   ${sections.ai}
   ${sections.data}
@@ -148,7 +151,7 @@ async function codexCommand(command) {
     const credential = await readPiCredential(CODEX_PROVIDER_ID);
     if (!credential) {
       console.log("Codex login is not configured. Run: ghac codex login");
-      console.log(`Current model: ${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
+      console.log(`Current model: ${modelLabel(config)}`);
       return;
     }
     const models = await createPiModelsWithStore(createPiCredentialStore());
@@ -156,7 +159,7 @@ async function codexCommand(command) {
     const model = models.getModel(selected.provider, selected.id);
     const auth = model ? await models.getAuth(model) : null;
     console.log(`Codex login: ${auth ? `configured via ${auth.source || "OAuth"}` : "stored but not usable"}`);
-    console.log(`Current model: ${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
+    console.log(`Current model: ${modelLabel(config)}`);
     return;
   }
   if (command === "logout") {
@@ -220,7 +223,7 @@ async function modelCommand(command, args) {
     return;
   }
   if (command === "current") {
-    console.log(`${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
+    console.log(modelLabel(config));
     return;
   }
   if (command === "test") {
@@ -266,6 +269,71 @@ async function starsCommand(command, args) {
     return;
   }
   printHelp("stars");
+}
+
+async function listsCommand(command, args) {
+  const config = await readConfig();
+  await applyProxyConfig(config);
+  const token = tokenFromConfig(config);
+  if (command === "sync") {
+    const state = await syncGitHubLists(token);
+    await writeJson("lists", state);
+    console.log(`Synced ${state.lists.length} GitHub Star Lists.`);
+    return;
+  }
+  if (command === "list") {
+    const state = args.includes("--local") ? await readJson("lists", { lists: [] }) : await syncAndCacheLists(token);
+    if (!state.lists.length) {
+      console.log("No GitHub Star Lists.");
+      return;
+    }
+    for (const list of state.lists) {
+      const visibility = list.private ? "private" : "public";
+      console.log(`${list.name} (${list.repos?.length || 0}, ${visibility})${list.description ? ` - ${list.description}` : ""}`);
+    }
+    return;
+  }
+  if (command === "show") {
+    const name = positionalArgs(args).join(" ");
+    const state = await syncAndCacheLists(token);
+    const list = findLocalList(state, name);
+    console.log(`${list.name}: ${list.description || ""}`);
+    for (const repo of list.repos || []) {
+      console.log(`  ${repo.full_name}${repo.language ? ` - ${repo.language}` : ""}`);
+      if (repo.description) console.log(`    ${repo.description}`);
+    }
+    return;
+  }
+  if (command === "create") {
+    const name = positionalArgs(args, ["--description"], ["--private"]).join(" ");
+    const description = readOption(args, "--description");
+    const list = await createGitHubList(token, {
+      name,
+      description,
+      isPrivate: args.includes("--private")
+    });
+    await syncAndCacheLists(token);
+    console.log(`Created GitHub Star List ${list.name}.`);
+    return;
+  }
+  if (command === "add") {
+    const { name, repo } = listRepoArgs(args, ["--create", "--no-star"]);
+    const result = await addRepoToGitHubList(token, name, repo, {
+      create: args.includes("--create"),
+      star: !args.includes("--no-star")
+    });
+    await syncAndCacheLists(token);
+    console.log(`${result.changed ? "Added" : "Already in list"}: ${result.repo} -> ${result.list.name}.`);
+    return;
+  }
+  if (command === "remove") {
+    const { name, repo } = listRepoArgs(args);
+    const result = await removeRepoFromGitHubList(token, name, repo);
+    await syncAndCacheLists(token);
+    console.log(`${result.changed ? "Removed" : "Not in list"}: ${result.repo} -> ${result.list.name}.`);
+    return;
+  }
+  printHelp("lists");
 }
 
 async function collectionsCommand(command, args) {
@@ -333,6 +401,24 @@ async function collectionsCommand(command, args) {
 }
 
 async function aiCommand(command, args) {
+  if (!command) {
+    await startAiRepl();
+    return;
+  }
+  if (command === "plan") {
+    const prompt = args.join(" ").trim();
+    if (!prompt) throw new Error("Usage: ghac ai plan <prompt>");
+    const plan = await createAndStorePlan(prompt);
+    printPlan(plan);
+    return;
+  }
+  if (command === "apply-plan") {
+    const plan = await readJson("plan", { actions: [] });
+    const applied = await applyGitHubPlan(plan);
+    await removeData("plan");
+    console.log(`Applied ${applied.length} plan actions.`);
+    return;
+  }
   if (command === "suggest") {
     const provider = readOption(args, "--provider");
     const model = readOption(args, "--model");
@@ -403,12 +489,223 @@ async function aiCommand(command, args) {
   printHelp("ai");
 }
 
+async function startAiRepl() {
+  const rl = createInterface({ input, output });
+  console.log("ghac ai interactive shell. Type /help for commands, /exit to quit.");
+  try {
+    while (true) {
+      const answer = await readReplAnswer(rl, "ghac-ai> ");
+      if (answer === null) return;
+      const line = answer.trim();
+      if (!line) continue;
+      if (line.startsWith("/")) {
+        const shouldExit = await runAiReplCommand(rl, line.slice(1));
+        if (shouldExit) return;
+        continue;
+      }
+      await handleNaturalAiInput(rl, line);
+    }
+  } finally {
+    rl.close();
+  }
+}
+
+async function readReplAnswer(rl, prompt) {
+  try {
+    return await rl.question(prompt);
+  } catch (error) {
+    if (error?.code === "ERR_USE_AFTER_CLOSE" || /readline was closed/i.test(error?.message || "")) return null;
+    throw error;
+  }
+}
+
+async function runAiReplCommand(rl, line) {
+  const args = parseCommandLine(line);
+  const [command, subcommand, ...rest] = args;
+  if (!command || command === "help") {
+    printAiReplHelp();
+    return false;
+  }
+  if (["exit", "quit", "q"].includes(command)) return true;
+  if (command === "auth") {
+    await authCommand(subcommand, rest);
+    return false;
+  }
+  if (command === "proxy") {
+    await proxyCommand(subcommand, rest);
+    return false;
+  }
+  if (command === "codex") {
+    await codexCommand(subcommand, rest);
+    return false;
+  }
+  if (command === "model") {
+    await modelCommand(subcommand || "current", rest);
+    return false;
+  }
+  if (command === "stars") {
+    await starsCommand(subcommand, rest);
+    return false;
+  }
+  if (command === "lists") {
+    await listsCommand(subcommand, rest);
+    return false;
+  }
+  if (command === "collections") {
+    await collectionsCommand(subcommand, rest);
+    return false;
+  }
+  if (command === "data") {
+    await dataCommand(subcommand);
+    return false;
+  }
+  if (command === "plan") {
+    if (subcommand) {
+      const plan = await createAndStorePlan([subcommand, ...rest].join(" "));
+      printPlan(plan);
+    } else {
+      printPlan(await readJson("plan", { actions: [] }));
+    }
+    return false;
+  }
+  if (command === "apply") {
+    const plan = await readJson("plan", { actions: [] });
+    if (!plan.actions?.length) {
+      console.log("No pending plan. Type a request first, or use /plan <request>.");
+      return false;
+    }
+    printPlan(plan);
+    const answer = (await rl.question("Apply this plan to GitHub? [y/N]: ")).trim().toLowerCase();
+    if (["y", "yes"].includes(answer)) {
+      const applied = await applyGitHubPlan(plan);
+      await removeData("plan");
+      console.log(`Applied ${applied.length} plan actions.`);
+    }
+    return false;
+  }
+  if (command === "clear") {
+    await removeData("plan");
+    console.log("Cleared pending AI plan.");
+    return false;
+  }
+  console.log(`Unknown AI shell command "/${command}". Type /help.`);
+  return false;
+}
+
+async function handleNaturalAiInput(rl, text) {
+  const plan = await createAndStorePlan(text);
+  printPlan(plan);
+  if (!plan.actions?.length) return;
+  const answer = (await rl.question("Apply this plan to GitHub now? [y/N]: ")).trim().toLowerCase();
+  if (["y", "yes"].includes(answer)) {
+    const applied = await applyGitHubPlan(plan);
+    await removeData("plan");
+    console.log(`Applied ${applied.length} plan actions.`);
+  }
+}
+
+async function createAndStorePlan(prompt) {
+  const plan = await planGitHubActions({ prompt });
+  await writeJson("plan", plan);
+  await appendHistory({ action: "ai.plan", prompt, count: plan.actions?.length || 0 });
+  return plan;
+}
+
+async function applyGitHubPlan(plan) {
+  const config = await readConfig();
+  await applyProxyConfig(config);
+  const token = tokenFromConfig(config);
+  const applied = [];
+  for (const action of plan.actions || []) {
+    if (action.type === "sync_stars") {
+      const stars = await listStarredRepos(token);
+      await writeJson("stars", { synced_at: new Date().toISOString(), stars });
+      applied.push({ type: action.type, count: stars.length });
+      continue;
+    }
+    if (action.type === "sync_lists") {
+      const state = await syncGitHubLists(token);
+      await writeJson("lists", state);
+      applied.push({ type: action.type, count: state.lists.length });
+      continue;
+    }
+    if (action.type === "create_list") {
+      const list = await createGitHubList(token, {
+        name: action.name,
+        description: action.description || "",
+        isPrivate: Boolean(action.private)
+      });
+      await syncAndCacheLists(token);
+      applied.push({ type: action.type, list: list.name });
+      continue;
+    }
+    if (action.type === "add_repo_to_list") {
+      const result = await addRepoToGitHubList(token, action.list, action.repo, {
+        create: Boolean(action.create),
+        star: true
+      });
+      await syncAndCacheLists(token);
+      applied.push({ type: action.type, repo: result.repo, list: result.list.name, changed: result.changed });
+      continue;
+    }
+    if (action.type === "remove_repo_from_list") {
+      const result = await removeRepoFromGitHubList(token, action.list, action.repo);
+      await syncAndCacheLists(token);
+      applied.push({ type: action.type, repo: result.repo, list: result.list.name, changed: result.changed });
+      continue;
+    }
+    throw new Error(`Unsupported plan action "${action.type}".`);
+  }
+  await appendHistory({ action: "ai.apply-plan", count: applied.length });
+  return applied;
+}
+
+function printAiReplHelp() {
+  console.log(`AI shell commands:
+  /help
+  /exit
+  /model [current|list|use ...]
+  /auth status
+  /stars sync|list|search|star|unstar
+  /lists sync|list|show|create|add|remove
+  /plan [natural language request]
+  /apply
+  /clear
+
+Natural language input asks the configured model to produce a GitHub Star Lists plan.`);
+}
+
+function printPlan(plan) {
+  if (plan.reply) console.log(plan.reply);
+  const actions = plan.actions || [];
+  if (!actions.length) {
+    console.log("No GitHub actions planned.");
+    return;
+  }
+  console.log("Plan:");
+  actions.forEach((action, index) => {
+    console.log(`  ${index + 1}. ${formatPlanAction(action)}`);
+  });
+  console.log("Run /apply in ghac ai, or run: ghac ai apply-plan");
+}
+
+function formatPlanAction(action) {
+  if (action.type === "sync_stars") return "sync starred repositories";
+  if (action.type === "sync_lists") return "sync GitHub Star Lists";
+  if (action.type === "create_list") return `create list "${action.name}"${action.private ? " (private)" : ""}`;
+  if (action.type === "add_repo_to_list") return `add ${action.repo} to "${action.list}"${action.create ? " (create list if missing)" : ""}`;
+  if (action.type === "remove_repo_from_list") return `remove ${action.repo} from "${action.list}"`;
+  return JSON.stringify(action);
+}
+
 async function dataCommand(command) {
   if (command === "path") {
     console.log(DATA_DIR);
     console.log(`config: ${dataPath("config")}`);
     console.log(`stars: ${dataPath("stars")}`);
+    console.log(`lists: ${dataPath("lists")}`);
     console.log(`collections: ${dataPath("collections")}`);
+    console.log(`plan: ${dataPath("plan")}`);
     console.log(`suggestions: ${dataPath("suggestions")}`);
     console.log(`history: ${dataPath("history")}`);
     return;
@@ -416,6 +713,7 @@ async function dataCommand(command) {
   if (command === "doctor") {
     const config = await readConfig();
     const stars = await readJson("stars", { stars: [] });
+    const lists = await readJson("lists", { lists: [] });
     const collections = await readCollections();
     const suggestions = await readJson("suggestions", { collections: [] });
     const starNames = new Set((stars.stars || []).map((repo) => repo.full_name));
@@ -433,8 +731,9 @@ async function dataCommand(command) {
     console.log(`Data dir: ${DATA_DIR}`);
     console.log(`GitHub token: ${tokenFromConfig(config) ? "configured" : "missing"}`);
     console.log(proxyStatusLines(config).join("; "));
-    console.log(`AI model: ${config.ai?.provider || "mock"}:${config.ai?.model || "local-rules"}`);
+    console.log(`AI model: ${modelLabel(config)}`);
     console.log(`Stars: ${(stars.stars || []).length}`);
+    console.log(`GitHub Star Lists: ${(lists.lists || []).length}`);
     console.log(`Collections: ${(collections.collections || []).length}`);
     console.log(`Pending suggestions: ${countSuggestedAssignments(suggestions)}`);
     if (duplicateCollections.length) console.log(`Duplicate collection names: ${duplicateCollections.join(", ")}`);
@@ -473,11 +772,47 @@ function findCollection(state, name) {
   return collection;
 }
 
+async function syncAndCacheLists(token) {
+  const state = await syncGitHubLists(token);
+  await writeJson("lists", state);
+  return state;
+}
+
+function findLocalList(state, name) {
+  const clean = String(name || "").trim().toLowerCase();
+  if (!clean) throw new Error("Usage: ghac lists show <name>");
+  const list = (state.lists || []).find((item) => item.name.toLowerCase() === clean || item.slug.toLowerCase() === clean);
+  if (!list) throw new Error(`GitHub list "${name}" does not exist.`);
+  return list;
+}
+
 function collectionRepoArgs(args) {
   const repo = args[args.length - 1];
   const name = args.slice(0, -1).join(" ");
   if (!name || !repo) throw new Error("Usage: ghac collections add <collection name> <owner/repo>");
   return { name, repo };
+}
+
+function listRepoArgs(args, booleanOptions = []) {
+  const values = positionalArgs(args, [], booleanOptions);
+  const repo = values[values.length - 1];
+  const name = values.slice(0, -1).join(" ");
+  if (!name || !repo) throw new Error("Usage: ghac lists add <list name> <owner/repo>");
+  return { name, repo };
+}
+
+function positionalArgs(args, valueOptions = [], booleanOptions = []) {
+  const values = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const item = args[index];
+    if (valueOptions.includes(item)) {
+      index += 1;
+      continue;
+    }
+    if (booleanOptions.includes(item)) continue;
+    values.push(item);
+  }
+  return values;
 }
 
 function parseProxyArgs(args) {
@@ -501,6 +836,12 @@ function defaultModelForProvider(provider) {
   if (provider === "codex") return "auto";
   if (provider === "openai-compatible") return "env";
   return "local-rules";
+}
+
+function modelLabel(config) {
+  if (!config.ai?.provider) return "not configured";
+  if (!config.ai?.model) return config.ai.provider;
+  return `${config.ai.provider}:${config.ai.model}`;
 }
 
 async function createPiModelsWithStore(store) {
@@ -671,6 +1012,48 @@ function readOption(args, name) {
   const index = args.indexOf(name);
   if (index === -1) return "";
   return args[index + 1] || "";
+}
+
+function parseCommandLine(line) {
+  const args = [];
+  let current = "";
+  let quote = "";
+  let escaping = false;
+  for (const char of String(line || "")) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaping = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = "";
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += char;
+  }
+  if (escaping) current += "\\";
+  if (quote) throw new Error("Unclosed quote in command.");
+  if (current) args.push(current);
+  return args;
 }
 
 async function promptSecret(label) {

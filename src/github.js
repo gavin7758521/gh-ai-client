@@ -1,4 +1,5 @@
 const GITHUB_API = "https://api.github.com";
+const GITHUB_GRAPHQL = "https://api.github.com/graphql";
 
 export function tokenFromConfig(config) {
   return process.env.GITHUB_TOKEN || config.github?.token || "";
@@ -48,7 +49,7 @@ export async function unstarRepo(token, fullName) {
   });
 }
 
-function normalizeRepo(repo, starredAt) {
+export function normalizeRepo(repo, starredAt) {
   return {
     id: repo.id,
     full_name: repo.full_name,
@@ -69,13 +70,35 @@ function normalizeRepo(repo, starredAt) {
   };
 }
 
-function splitRepo(fullName) {
+export function splitRepo(fullName) {
   const [owner, repo] = String(fullName).split("/");
   if (!owner || !repo) throw new Error(`Expected owner/repo, got "${fullName}".`);
   return { owner, repo };
 }
 
-async function githubRequest(path, { token, method = "GET", accept = "application/vnd.github+json", expectEmpty = false } = {}) {
+export async function githubGraphql(token, query, variables = {}) {
+  if (!token) throw new Error("GitHub token is required. Run: ghac auth set-token");
+  const response = await fetch(GITHUB_GRAPHQL, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "gh-ai-client"
+    },
+    body: JSON.stringify({ query, variables })
+  });
+  const text = await response.text();
+  const payload = text ? safeJson(text) : null;
+  if (!response.ok || payload?.errors?.length) {
+    const detail = payload?.errors?.map((error) => error.message).join("; ") || payload?.message || text || response.statusText;
+    throw new Error(`GitHub GraphQL failed (${response.status}): ${detail}`);
+  }
+  return payload.data;
+}
+
+export async function githubRequest(path, { token, method = "GET", accept = "application/vnd.github+json", expectEmpty = false } = {}) {
   if (!token) throw new Error("GitHub token is required. Run: ghac auth set-token");
   const response = await fetch(`${GITHUB_API}${path}`, {
     method,

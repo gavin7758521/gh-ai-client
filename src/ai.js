@@ -12,12 +12,13 @@ export const MODEL_PRESETS = [
 export async function suggestCollections({ provider, model, limit = 200 } = {}) {
   const config = await readConfig();
   await applyProxyConfig(config);
-  const selectedProvider = provider || config.ai?.provider || "mock";
+  const selectedProvider = provider || config.ai?.provider || "";
   const selectedModel = model || (provider && provider !== config.ai?.provider ? defaultModelForProvider(provider) : config.ai?.model) || defaultModelForProvider(selectedProvider);
   const ai = {
     provider: selectedProvider,
     model: selectedModel
   };
+  if (!ai.provider) throw new Error("No AI model configured. Run: ghac codex login, then ghac model use codex");
   const stars = await readJson("stars", { stars: [] });
   const collections = await readJson("collections", { collections: [] });
   const sample = stars.stars.slice(0, limit);
@@ -34,6 +35,33 @@ export async function suggestCollections({ provider, model, limit = 200 } = {}) 
   };
   await writeJson("suggestions", payload);
   return payload;
+}
+
+export async function planGitHubActions({ prompt, limit = 120 } = {}) {
+  const message = String(prompt || "").trim();
+  if (!message) throw new Error("Prompt is required.");
+  const config = await readConfig();
+  await applyProxyConfig(config);
+  const ai = {
+    provider: config.ai?.provider || "",
+    model: config.ai?.model || ""
+  };
+  if (!ai.provider || ai.provider === "mock") {
+    throw new Error("No external AI model configured. Run: ghac codex login, then ghac model use codex");
+  }
+  const stars = await readJson("stars", { stars: [] });
+  const lists = await readJson("lists", { lists: [] });
+  const text = await completeText(ai, buildActionPlanMessages(message, stars.stars || [], lists.lists || [], limit), config, {
+    systemPrompt: "You help manage GitHub starred repositories and GitHub Star Lists. Return only strict JSON."
+  });
+  const parsed = parseActionPlan(text);
+  return {
+    provider: ai.provider,
+    model: ai.model,
+    created_at: new Date().toISOString(),
+    prompt: message,
+    ...parsed
+  };
 }
 
 function defaultModelForProvider(provider) {
@@ -89,6 +117,11 @@ async function modelSuggest(ai, stars, collections, config) {
 }
 
 async function openAiCompatibleSuggest(stars, collections) {
+  const text = await openAiCompatibleComplete(buildMessages(stars, collections));
+  return parseJsonContent(text);
+}
+
+async function openAiCompatibleComplete(messages) {
   const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
   const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY;
   const model = process.env.OPENAI_COMPATIBLE_MODEL;
@@ -109,10 +142,23 @@ async function openAiCompatibleSuggest(stars, collections) {
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(payload?.error?.message || payload?.message || "AI request failed.");
-  return parseJsonContent(payload?.choices?.[0]?.message?.content);
+  return payload?.choices?.[0]?.message?.content || "";
 }
 
 async function piSuggest(ai, stars, collections, config) {
+  const text = await piComplete(ai, buildMessages(stars, collections), config, {
+    systemPrompt: "You organize GitHub starred repositories. Return only strict JSON with collections."
+  });
+  return parseJsonContent(text);
+}
+
+async function completeText(ai, messages, config, { systemPrompt = "You are a concise GitHub management assistant." } = {}) {
+  if (ai.provider === "openai-compatible") return openAiCompatibleComplete(messages);
+  if (ai.provider === "pi") return piComplete(ai, messages, config, { systemPrompt });
+  throw new Error(`Unsupported AI provider "${ai.provider}". Run: ghac model list`);
+}
+
+async function piComplete(ai, messages, config, { systemPrompt }) {
   let pi;
   try {
     pi = await import("@earendil-works/pi-ai/providers/all");
@@ -141,10 +187,10 @@ async function piSuggest(ai, stars, collections, config) {
     ...(Object.keys(proxyEnv).length ? { env: proxyEnv } : {})
   };
   const response = await models.completeSimple(model, {
-    systemPrompt: "You organize GitHub starred repositories. Return only strict JSON with collections.",
+    systemPrompt,
     messages: [{
       role: "user",
-      content: buildMessages(stars, collections).map((message) => message.content).join("\n\n"),
+      content: messages.map((message) => message.content).join("\n\n"),
       timestamp: Date.now()
     }]
   }, options);
@@ -152,7 +198,7 @@ async function piSuggest(ai, stars, collections, config) {
   if (!text) {
     throw new Error(`pi model ${provider}/${modelId} returned no text. Try a different model or check provider credentials.`);
   }
-  return parseJsonContent(text);
+  return text;
 }
 
 export async function listPiModels(provider = "") {
@@ -228,9 +274,82 @@ function buildMessages(stars, collections) {
   ];
 }
 
+function buildActionPlanMessages(prompt, stars, lists, limit) {
+  const repoSample = stars.slice(0, limit).map((repo) => ({
+    full_name: repo.full_name,
+    description: repo.description,
+    language: repo.language,
+    topics: repo.topics,
+    stargazers_count: repo.stargazers_count,
+    archived: repo.archived,
+    fork: repo.fork,
+    starred_at: repo.starred_at
+  }));
+  const listSample = lists.map((list) => ({
+    name: list.name,
+    slug: list.slug,
+    description: list.description,
+    private: list.private,
+    repos: (list.repos || []).map((repo) => repo.full_name)
+  }));
+  return [
+    {
+      role: "system",
+      content: [
+        "Return only strict JSON with this shape:",
+        "{\"reply\":\"short Chinese response\",\"actions\":[{\"type\":\"sync_stars\"},{\"type\":\"sync_lists\"},{\"type\":\"create_list\",\"name\":\"...\",\"description\":\"...\",\"private\":false},{\"type\":\"add_repo_to_list\",\"repo\":\"owner/repo\",\"list\":\"...\",\"create\":true},{\"type\":\"remove_repo_from_list\",\"repo\":\"owner/repo\",\"list\":\"...\"}]}",
+        "Use actions only when the user is asking to organize or change GitHub Star Lists.",
+        "Do not invent repository names. Use repos from context unless the user explicitly writes an owner/repo.",
+        "For unclear requests, return no actions and ask a concise clarification in reply."
+      ].join("\n")
+    },
+    {
+      role: "user",
+      content: JSON.stringify({ request: prompt, stars: repoSample, lists: listSample }, null, 2)
+    }
+  ];
+}
+
 function parseJsonContent(content) {
   const clean = String(content || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   const parsed = JSON.parse(clean);
   if (!Array.isArray(parsed.collections)) throw new Error("AI JSON must include collections array.");
   return parsed;
+}
+
+function parseActionPlan(content) {
+  const clean = String(content || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const parsed = JSON.parse(clean);
+  const actions = Array.isArray(parsed.actions) ? parsed.actions.map(normalizeAction).filter(Boolean) : [];
+  return {
+    reply: String(parsed.reply || "").trim(),
+    actions
+  };
+}
+
+function normalizeAction(action) {
+  const type = String(action?.type || "").trim();
+  if (type === "sync_stars" || type === "sync_lists") return { type };
+  if (type === "create_list") {
+    const name = String(action.name || "").trim();
+    if (!name) return null;
+    return {
+      type,
+      name,
+      description: String(action.description || ""),
+      private: Boolean(action.private)
+    };
+  }
+  if (type === "add_repo_to_list" || type === "remove_repo_from_list") {
+    const repo = String(action.repo || "").trim();
+    const list = String(action.list || "").trim();
+    if (!repo || !list) return null;
+    return {
+      type,
+      repo,
+      list,
+      create: Boolean(action.create)
+    };
+  }
+  return null;
 }
