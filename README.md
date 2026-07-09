@@ -2,6 +2,12 @@
 
 GitHub AI Manager is a Node.js CLI for AI-assisted GitHub management. It operates on live GitHub API data.
 
+## Install from npm
+
+```bash
+npm install -g @gavin7758521/github-ai-manager
+```
+
 ## Install locally
 
 ```bash

@@ -1,5 +1,5 @@
 {
-  "name": "github-ai-manager",
+  "name": "@gavin7758521/github-ai-manager",
   "version": "0.1.0",
   "description": "AI-assisted GitHub manager for CLI and agent workflows.",
   "type": "module",
