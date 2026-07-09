@@ -22,7 +22,7 @@ export async function main(argv) {
   if (group === "lists") return listsCommand(command, rest);
   if (group === "ai") return aiCommand(command, rest);
   if (group === "data") return dataCommand(command);
-  throw new Error(`Unknown command "${group}". Run: ghac help`);
+  throw new Error(`Unknown command "${group}". Run: gham help`);
 }
 
 function printHelp(topic = "") {
@@ -37,20 +37,20 @@ function printHelp(topic = "") {
     data: "data path | data doctor"
   };
   if (topic && sections[topic]) {
-    console.log(`Usage: ghac ${sections[topic]}`);
+    console.log(`Usage: gham ${sections[topic]}`);
     return;
   }
-  console.log(`ghac
+  console.log(`gham
 
 Usage:
-  ghac help [auth|proxy|codex|model|stars|lists|ai|data]
-  ghac auth set-token
-  ghac proxy set http://127.0.0.1:7890
-  ghac codex login
-  ghac model use codex
-  ghac stars list
-  ghac lists list
-  ghac ai
+  gham help [auth|proxy|codex|model|stars|lists|ai|data]
+  gham auth set-token
+  gham proxy set http://127.0.0.1:7890
+  gham codex login
+  gham model use codex
+  gham stars list
+  gham lists list
+  gham ai
 
 Commands:
   ${sections.auth}
@@ -146,7 +146,7 @@ async function codexCommand(command) {
   if (command === "status") {
     const credential = await readPiCredential(CODEX_PROVIDER_ID);
     if (!credential) {
-      console.log("Codex login is not configured. Run: ghac codex login");
+      console.log("Codex login is not configured. Run: gham codex login");
       console.log(`Current model: ${modelLabel(config)}`);
       return;
     }
@@ -191,16 +191,16 @@ async function modelCommand(command, args) {
   }
   if (command === "use") {
     const value = args[0];
-    if (!value) throw new Error("Usage: ghac model use <provider[:model]|codex>");
+    if (!value) throw new Error("Usage: gham model use <provider[:model]|codex>");
     if (isCodexAlias(value)) {
       const model = await recommendedCodexModel();
       config.ai = { provider: "pi", model: `${model.provider}/${model.id}` };
       await writeConfig(config);
       console.log(`Using Codex model through pi: ${config.ai.model}.`);
       if (model.provider === CODEX_PROVIDER_ID && !await readPiCredential(CODEX_PROVIDER_ID)) {
-        console.log("Codex login is not configured. Run: ghac codex login");
+        console.log("Codex login is not configured. Run: gham codex login");
       } else if (model.provider === "openai" && !process.env.OPENAI_API_KEY) {
-        console.log("OpenAI auth is not configured in this shell. Set OPENAI_API_KEY before running: ghac ai");
+        console.log("OpenAI auth is not configured in this shell. Set OPENAI_API_KEY before running: gham ai");
       }
       return;
     }
@@ -235,7 +235,7 @@ async function starsCommand(command, args) {
   }
   if (command === "search") {
     const keyword = positionalArgs(args, ["--max-pages"]).join(" ").trim().toLowerCase();
-    if (!keyword) throw new Error("Usage: ghac stars search <keyword>");
+    if (!keyword) throw new Error("Usage: gham stars search <keyword>");
     const maxPages = Number(readOption(args, "--max-pages") || 100);
     const stars = await listStarredRepos(token, { maxPages });
     printRepos(stars.filter((repo) => repoMatches(repo, keyword)).slice(0, 100));
@@ -317,10 +317,10 @@ async function aiCommand(command, args) {
   }
   if (command === "plan") {
     const prompt = args.join(" ").trim();
-    if (!prompt) throw new Error("Usage: ghac ai plan <prompt>");
+    if (!prompt) throw new Error("Usage: gham ai plan <prompt>");
     const plan = await createPlanFromLiveGitHub(prompt);
     printPlan(plan);
-    console.log("Command-line plans are not saved. Run ghac ai to review and apply in one session.");
+    console.log("Command-line plans are not saved. Run gham ai to review and apply in one session.");
     return;
   }
   printHelp("ai");
@@ -329,10 +329,10 @@ async function aiCommand(command, args) {
 async function startAiRepl() {
   const session = { plan: null, history: [], context: null };
   const rl = createInterface({ input, output });
-  console.log("ghac ai interactive shell. Type /help for commands, /exit to quit.");
+  console.log("gham ai interactive shell. Type /help for commands, /exit to quit.");
   try {
     while (true) {
-      const answer = await readReplAnswer(rl, "ghac-ai> ");
+      const answer = await readReplAnswer(rl, "gham-ai> ");
       if (answer === null) return;
       const line = answer.trim();
       if (!line) continue;
@@ -639,7 +639,7 @@ function listRepoArgs(args, booleanOptions = []) {
   const values = positionalArgs(args, [], booleanOptions);
   const repo = values[values.length - 1];
   const name = values.slice(0, -1).join(" ");
-  if (!name || !repo) throw new Error("Usage: ghac lists add <list name> <owner/repo>");
+  if (!name || !repo) throw new Error("Usage: gham lists add <list name> <owner/repo>");
   return { name, repo };
 }
 
@@ -658,7 +658,7 @@ function positionalArgs(args, valueOptions = [], booleanOptions = []) {
 }
 
 function parseProxyArgs(args) {
-  if (!args.length) throw new Error("Usage: ghac proxy set <url>");
+  if (!args.length) throw new Error("Usage: gham proxy set <url>");
   if (!args[0].startsWith("--")) {
     const url = args[0];
     return normalizeProxyConfig({ http: url, https: url });
@@ -669,7 +669,7 @@ function parseProxyArgs(args) {
     all: readOption(args, "--all"),
     noProxy: readOption(args, "--no-proxy")
   });
-  if (!Object.keys(proxy).length) throw new Error("Usage: ghac proxy set --http <url> [--https <url>] [--all <url>] [--no-proxy list]");
+  if (!Object.keys(proxy).length) throw new Error("Usage: gham proxy set --http <url> [--https <url>] [--all <url>] [--no-proxy list]");
   return proxy;
 }
 

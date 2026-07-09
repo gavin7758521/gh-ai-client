@@ -77,7 +77,7 @@ export function splitRepo(fullName) {
 }
 
 export async function githubGraphql(token, query, variables = {}) {
-  if (!token) throw new Error("GitHub token is required. Run: ghac auth set-token");
+  if (!token) throw new Error("GitHub token is required. Run: gham auth set-token");
   const response = await fetch(GITHUB_GRAPHQL, {
     method: "POST",
     headers: {
@@ -85,7 +85,7 @@ export async function githubGraphql(token, query, variables = {}) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "gh-ai-client"
+      "User-Agent": "github-ai-manager"
     },
     body: JSON.stringify({ query, variables })
   });
@@ -99,14 +99,14 @@ export async function githubGraphql(token, query, variables = {}) {
 }
 
 export async function githubRequest(path, { token, method = "GET", accept = "application/vnd.github+json", expectEmpty = false } = {}) {
-  if (!token) throw new Error("GitHub token is required. Run: ghac auth set-token");
+  if (!token) throw new Error("GitHub token is required. Run: gham auth set-token");
   const response = await fetch(`${GITHUB_API}${path}`, {
     method,
     headers: {
       Accept: accept,
       Authorization: `Bearer ${token}`,
       "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "gh-ai-client"
+      "User-Agent": "github-ai-manager"
     }
   });
   if (response.status === 204 && expectEmpty) return null;

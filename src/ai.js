@@ -18,7 +18,7 @@ export async function planGitHubActions({ prompt, stars = [], lists = [], histor
     model: config.ai?.model || ""
   };
   if (!ai.provider) {
-    throw new Error("No AI model configured. Run: ghac codex login, then ghac model use codex");
+    throw new Error("No AI model configured. Run: gham codex login, then gham model use codex");
   }
   const text = await completeText(ai, buildActionPlanMessages(message, stars, lists, history, pendingPlan, limit), config, {
     systemPrompt: "You help manage GitHub starred repositories and GitHub Star Lists. Return only strict JSON."
@@ -45,7 +45,7 @@ export async function testConfiguredModel() {
 async function completeText(ai, messages, config, { systemPrompt = "You are a concise GitHub management assistant." } = {}) {
   if (ai.provider === "openai-compatible") return openAiCompatibleComplete(messages);
   if (ai.provider === "pi") return piComplete(ai, messages, config, { systemPrompt });
-  throw new Error(`Unsupported AI provider "${ai.provider}". Run: ghac model list`);
+  throw new Error(`Unsupported AI provider "${ai.provider}". Run: gham model list`);
 }
 
 async function openAiCompatibleComplete(messages) {
@@ -77,13 +77,13 @@ async function piComplete(ai, messages, config, { systemPrompt }) {
   try {
     pi = await import("@earendil-works/pi-ai/providers/all");
   } catch {
-    throw new Error("pi provider is not installed. Run npm install in the gh-ai-client project.");
+    throw new Error("pi provider is not installed. Run npm install in the github-ai-manager project.");
   }
-  const modelRef = process.env.GH_AI_CLIENT_PI_MODEL || ai.model || "openai/gpt-4o-mini";
+  const modelRef = process.env.GHAM_PI_MODEL || ai.model || "openai/gpt-4o-mini";
   const [provider, ...modelParts] = modelRef.split("/");
   const modelId = modelParts.join("/");
   if (!provider || !modelId) {
-    throw new Error("pi model must be provider/model, for example: ghac model use pi:openai/gpt-4o-mini");
+    throw new Error("pi model must be provider/model, for example: gham model use pi:openai/gpt-4o-mini");
   }
   const models = pi.builtinModels({ credentials: createPiCredentialStore() });
   const model = models.getModel(provider, modelId);
@@ -268,7 +268,7 @@ function codexModelScore(id) {
 }
 
 function piAuthHint(provider) {
-  if (provider === "openai-codex") return "Run: ghac codex login.";
+  if (provider === "openai-codex") return "Run: gham codex login.";
   if (provider === "openai") return "Set OPENAI_API_KEY in this shell.";
   if (provider === "anthropic") return "Set ANTHROPIC_API_KEY in this shell.";
   if (provider === "google") return "Set GEMINI_API_KEY or GOOGLE_API_KEY in this shell.";

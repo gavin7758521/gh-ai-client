@@ -243,7 +243,7 @@ async function getTargetList(token, listName, { create }) {
     state = await listGitHubLists(token, { includeItems: true });
     list = findListInState(state, listName);
   }
-  if (!list) throw new Error(`GitHub list "${listName}" does not exist. Run: ghac lists create "${listName}"`);
+  if (!list) throw new Error(`GitHub list "${listName}" does not exist. Run: gham lists create "${listName}"`);
   return { list, state };
 }
 

@@ -1,11 +1,11 @@
-# gh-ai-client
+# github-ai-manager
 
-Small Node.js CLI for AI-assisted GitHub management. It operates on live GitHub API data.
+GitHub AI Manager is a Node.js CLI for AI-assisted GitHub management. It operates on live GitHub API data.
 
 ## Install locally
 
 ```bash
-cd ~/workspace/repos/gh-ai-client
+cd ~/workspace/repos/github-ai-manager
 npm install
 npm link
 ```
@@ -13,53 +13,53 @@ npm link
 After linking, use:
 
 ```bash
-ghac help
+gham help
 ```
 
 ## Commands
 
 ```bash
-ghac help
+gham help
 
-ghac auth set-token
-ghac auth status
-ghac auth clear-token
+gham auth set-token
+gham auth status
+gham auth clear-token
 
-ghac proxy set http://127.0.0.1:7890
-ghac proxy status
-ghac proxy clear
+gham proxy set http://127.0.0.1:7890
+gham proxy status
+gham proxy clear
 
-ghac codex login
-ghac codex status
-ghac codex logout
+gham codex login
+gham codex status
+gham codex logout
 
-ghac model list
-ghac model list codex
-ghac model list pi openai
-ghac model use codex
-ghac model use pi:openai/gpt-4o-mini
-ghac model current
-ghac model test
+gham model list
+gham model list codex
+gham model list pi openai
+gham model use codex
+gham model use pi:openai/gpt-4o-mini
+gham model current
+gham model test
 
-ghac stars list
-ghac stars list --limit 20
-ghac stars search agent
-ghac stars star owner/repo
-ghac stars unstar owner/repo
+gham stars list
+gham stars list --limit 20
+gham stars search agent
+gham stars star owner/repo
+gham stars unstar owner/repo
 
-ghac lists list
-ghac lists show "AI Tools"
-ghac lists create "AI Tools"
-ghac lists create "AI Tools" --description "AI projects and agents" --private
-ghac lists add "AI Tools" openai/codex
-ghac lists add "AI Tools" openai/codex --create
-ghac lists remove "AI Tools" openai/codex
+gham lists list
+gham lists show "AI Tools"
+gham lists create "AI Tools"
+gham lists create "AI Tools" --description "AI projects and agents" --private
+gham lists add "AI Tools" openai/codex
+gham lists add "AI Tools" openai/codex --create
+gham lists remove "AI Tools" openai/codex
 
-ghac ai
-ghac ai plan "帮我把 AI agent 相关仓库整理到 AI-智能体"
+gham ai
+gham ai plan "帮我把 AI agent 相关仓库整理到 AI-智能体"
 
-ghac data path
-ghac data doctor
+gham data path
+gham data doctor
 ```
 
 `stars`, `lists`, and `ai` read GitHub online through REST or GraphQL on each run.
@@ -69,22 +69,22 @@ ghac data doctor
 Only credentials and configuration are stored locally:
 
 ```text
-~/.ghac/
+~/.gham/
   config.json
   pi-auth.json
 ```
 
 `config.json` stores the GitHub token, proxy config, and selected model. `pi-auth.json` stores pi/Codex OAuth credentials. Stars, Star Lists, and AI plans are not stored by this CLI.
 
-Set `GHAC_HOME` to use a different config directory for tests. `GH_AI_CLIENT_HOME` is still accepted as a legacy override.
+Set `GHAM_HOME` to use a different config directory for tests.
 
 ## GitHub Star Lists
 
-`ghac stars` uses GitHub REST for starred repositories. `ghac lists` uses GitHub GraphQL `UserList` APIs for GitHub-native Star Lists:
+`gham stars` uses GitHub REST for starred repositories. `gham lists` uses GitHub GraphQL `UserList` APIs for GitHub-native Star Lists:
 
 ```bash
-ghac lists list
-ghac lists add "AI Tools" openai/codex
+gham lists list
+gham lists add "AI Tools" openai/codex
 ```
 
 `lists add` preserves the repository's existing Star List memberships. By default it also stars the repository first if it is not already starred.
@@ -92,7 +92,7 @@ ghac lists add "AI Tools" openai/codex
 ## AI Shell
 
 ```bash
-ghac ai
+gham ai
 ```
 
 Inside the shell, natural language reads live GitHub data, asks the configured model for a plan, and asks before applying write actions:
@@ -111,21 +111,21 @@ Inside the shell, natural language reads live GitHub data, asks the configured m
 /exit
 ```
 
-`ghac ai` keeps conversation history, the latest plan, and the latest GitHub context in memory while the shell is running. It does not write that session memory to disk.
+`gham ai` keeps conversation history, the latest plan, and the latest GitHub context in memory while the shell is running. It does not write that session memory to disk.
 
 Use `/context` to inspect the current in-memory state, `/refresh` to reload GitHub online data, and `/forget` to clear conversation memory and the pending plan.
 
-Command-line `ghac ai plan ...` prints a plan but does not save it. Use `ghac ai` when you want to apply a plan.
+Command-line `gham ai plan ...` prints a plan but does not save it. Use `gham ai` when you want to apply a plan.
 
 ## AI Providers
 
 `pi` uses `@earendil-works/pi-ai`:
 
 ```bash
-ghac codex login
-ghac model list codex
-ghac model use codex
-ghac ai
+gham codex login
+gham model list codex
+gham model use codex
+gham ai
 ```
 
 `openai-compatible` uses these environment variables:
@@ -139,11 +139,11 @@ OPENAI_COMPATIBLE_MODEL=...
 ## Suggested Workflow
 
 ```bash
-ghac proxy set http://127.0.0.1:7890
-ghac auth set-token
-ghac codex login
-ghac model use codex
-ghac ai
+gham proxy set http://127.0.0.1:7890
+gham auth set-token
+gham codex login
+gham model use codex
+gham ai
 ```
 
 ## Secret Scanning

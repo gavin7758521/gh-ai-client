@@ -1,15 +1,14 @@
 {
-  "name": "gh-ai-client",
+  "name": "github-ai-manager",
   "version": "0.1.0",
-  "description": "AI-assisted GitHub client CLI, starting with starred repository organization.",
+  "description": "AI-assisted GitHub manager for CLI and agent workflows.",
   "type": "module",
   "bin": {
-    "ghac": "./bin/gh-ai-client.js",
-    "gh-ai-client": "./bin/gh-ai-client.js"
+    "gham": "./bin/gham.js"
   },
   "scripts": {
-    "check": "node --check bin/gh-ai-client.js && node --check src/*.js",
-    "smoke": "GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js help && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js model list && GHAC_HOME=/tmp/ghac-smoke node bin/gh-ai-client.js data path",
+    "check": "node --check bin/gham.js && node --check src/*.js",
+    "smoke": "GHAM_HOME=/tmp/gham-smoke node bin/gham.js help && GHAM_HOME=/tmp/gham-smoke node bin/gham.js model list && GHAM_HOME=/tmp/gham-smoke node bin/gham.js data path",
     "test": "npm run check && npm run smoke",
     "secrets": "gitleaks git --redact --no-banner",
     "secrets:dir": "gitleaks dir --redact --no-banner .",
