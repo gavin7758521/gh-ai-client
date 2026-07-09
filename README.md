@@ -55,8 +55,8 @@ gham lists add "AI Tools" openai/codex
 gham lists add "AI Tools" openai/codex --create
 gham lists remove "AI Tools" openai/codex
 
-gham ai
-gham ai plan "帮我把 AI agent 相关仓库整理到 AI-智能体"
+gham cli
+gham cli plan "帮我把 AI agent 相关仓库整理到 AI-智能体"
 
 gham mcp serve
 gham-mcp
@@ -65,7 +65,7 @@ gham data path
 gham data doctor
 ```
 
-`stars`, `lists`, and `ai` read GitHub online through REST or GraphQL on each run.
+`stars`, `lists`, and `cli` read GitHub online through REST or GraphQL on each run.
 
 ## Data
 
@@ -92,10 +92,10 @@ gham lists add "AI Tools" openai/codex
 
 `lists add` preserves the repository's existing Star List memberships. By default it also stars the repository first if it is not already starred.
 
-## AI Shell
+## CLI Shell
 
 ```bash
-gham ai
+gham cli
 ```
 
 Inside the shell, natural language reads live GitHub data, asks the configured model for a plan, and asks before applying write actions:
@@ -114,11 +114,11 @@ Inside the shell, natural language reads live GitHub data, asks the configured m
 /exit
 ```
 
-`gham ai` keeps conversation history, the latest plan, and the latest GitHub context in memory while the shell is running. It does not write that session memory to disk.
+`gham cli` keeps conversation history, the latest plan, and the latest GitHub context in memory while the shell is running. It does not write that session memory to disk.
 
 Use `/context` to inspect the current in-memory state, `/refresh` to reload GitHub online data, and `/forget` to clear conversation memory and the pending plan.
 
-Command-line `gham ai plan ...` prints a plan but does not save it. Use `gham ai` when you want to apply a plan.
+Command-line `gham cli plan ...` prints a plan but does not save it. Use `gham cli` when you want to apply a plan.
 
 ## MCP Server
 
@@ -163,7 +163,7 @@ lists_remove_repo
 gham codex login
 gham model list codex
 gham model use codex
-gham ai
+gham cli
 ```
 
 `openai-compatible` uses these environment variables:
@@ -181,7 +181,7 @@ gham proxy set http://127.0.0.1:7890
 gham auth set-token
 gham codex login
 gham model use codex
-gham ai
+gham cli
 ```
 
 ## Secret Scanning

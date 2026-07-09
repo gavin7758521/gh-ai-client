@@ -21,7 +21,7 @@ export async function main(argv) {
   if (group === "model") return modelCommand(command, rest);
   if (group === "stars") return starsCommand(command, rest);
   if (group === "lists") return listsCommand(command, rest);
-  if (group === "ai") return aiCommand(command, rest);
+  if (group === "cli") return cliCommand(command, rest);
   if (group === "mcp") return mcpCommand(command);
   if (group === "data") return dataCommand(command);
   throw new Error(`Unknown command "${group}". Run: gham help`);
@@ -35,7 +35,7 @@ function printHelp(topic = "") {
     model: "model list [pi [provider]|codex|--all] | model use <provider[:model]|codex> | model current | model test",
     stars: "stars list [--limit N] [--max-pages N] | stars search <keyword> [--max-pages N] | stars star <owner/repo> | stars unstar <owner/repo>",
     lists: "lists list | lists show <name> | lists create <name> [--description text] [--private] | lists add <name> <owner/repo> [--create] | lists remove <name> <owner/repo>",
-    ai: "ai | ai plan <prompt>",
+    cli: "cli | cli plan <prompt>",
     mcp: "mcp serve",
     data: "data path | data doctor"
   };
@@ -46,14 +46,14 @@ function printHelp(topic = "") {
   console.log(`gham
 
 Usage:
-  gham help [auth|proxy|codex|model|stars|lists|ai|mcp|data]
+  gham help [auth|proxy|codex|model|stars|lists|cli|mcp|data]
   gham auth set-token
   gham proxy set http://127.0.0.1:7890
   gham codex login
   gham model use codex
   gham stars list
   gham lists list
-  gham ai
+  gham cli
   gham mcp serve
 
 Commands:
@@ -63,7 +63,7 @@ Commands:
   ${sections.model}
   ${sections.stars}
   ${sections.lists}
-  ${sections.ai}
+  ${sections.cli}
   ${sections.mcp}
   ${sections.data}
 
@@ -205,7 +205,7 @@ async function modelCommand(command, args) {
       if (model.provider === CODEX_PROVIDER_ID && !await readPiCredential(CODEX_PROVIDER_ID)) {
         console.log("Codex login is not configured. Run: gham codex login");
       } else if (model.provider === "openai" && !process.env.OPENAI_API_KEY) {
-        console.log("OpenAI auth is not configured in this shell. Set OPENAI_API_KEY before running: gham ai");
+        console.log("OpenAI auth is not configured in this shell. Set OPENAI_API_KEY before running: gham cli");
       }
       return;
     }
@@ -315,20 +315,20 @@ async function listsCommand(command, args) {
   printHelp("lists");
 }
 
-async function aiCommand(command, args) {
+async function cliCommand(command, args) {
   if (!command) {
-    await startAiRepl();
+    await startCliRepl();
     return;
   }
   if (command === "plan") {
     const prompt = args.join(" ").trim();
-    if (!prompt) throw new Error("Usage: gham ai plan <prompt>");
+    if (!prompt) throw new Error("Usage: gham cli plan <prompt>");
     const plan = await createPlanFromLiveGitHub(prompt);
     printPlan(plan);
-    console.log("Command-line plans are not saved. Run gham ai to review and apply in one session.");
+    console.log("Command-line plans are not saved. Run gham cli to review and apply in one session.");
     return;
   }
-  printHelp("ai");
+  printHelp("cli");
 }
 
 async function mcpCommand(command) {
@@ -339,33 +339,33 @@ async function mcpCommand(command) {
   printHelp("mcp");
 }
 
-async function startAiRepl() {
+async function startCliRepl() {
   const session = { plan: null, history: [], context: null };
   const rl = createInterface({ input, output });
-  console.log("gham ai interactive shell. Type /help for commands, /exit to quit.");
+  console.log("gham cli interactive shell. Type /help for commands, /exit to quit.");
   try {
     while (true) {
-      const answer = await readReplAnswer(rl, "gham-ai> ");
+      const answer = await readReplAnswer(rl, "gham-cli> ");
       if (answer === null) return;
       const line = answer.trim();
       if (!line) continue;
       if (line.startsWith("/")) {
-        const shouldExit = await runAiReplCommand(rl, line.slice(1), session);
+        const shouldExit = await runCliReplCommand(rl, line.slice(1), session);
         if (shouldExit) return;
         continue;
       }
-      await handleNaturalAiInput(rl, line, session);
+      await handleNaturalCliInput(rl, line, session);
     }
   } finally {
     rl.close();
   }
 }
 
-async function runAiReplCommand(rl, line, session) {
+async function runCliReplCommand(rl, line, session) {
   const args = parseCommandLine(line);
   const [command, subcommand, ...rest] = args;
   if (!command || command === "help") {
-    printAiReplHelp();
+    printCliReplHelp();
     return false;
   }
   if (["exit", "quit", "q"].includes(command)) return true;
@@ -442,11 +442,11 @@ async function runAiReplCommand(rl, line, session) {
     console.log("Cleared in-memory conversation and pending plan. GitHub context remains in memory; use /refresh to reload it.");
     return false;
   }
-  console.log(`Unknown AI shell command "/${command}". Type /help.`);
+  console.log(`Unknown CLI shell command "/${command}". Type /help.`);
   return false;
 }
 
-async function handleNaturalAiInput(rl, text, session) {
+async function handleNaturalCliInput(rl, text, session) {
   session.plan = await createPlanFromSession(text, session);
   printPlan(session.plan);
   if (!session.plan.actions?.length) return;
@@ -570,8 +570,8 @@ async function applyGitHubPlan(plan) {
   return applied;
 }
 
-function printAiReplHelp() {
-  console.log(`AI shell commands:
+function printCliReplHelp() {
+  console.log(`CLI shell commands:
   /help
   /exit
   /model [current|list|use ...]
