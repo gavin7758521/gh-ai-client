@@ -4,9 +4,15 @@
   "description": "AI-assisted GitHub manager for CLI and agent workflows.",
   "type": "module",
   "bin": {
-    "gham": "./bin/gham.js",
-    "gham-mcp": "./bin/gham-mcp.js"
+    "gham": "bin/gham.js",
+    "gham-mcp": "bin/gham-mcp.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "check": "node --check bin/*.js && node --check src/*.js",
     "smoke": "GHAM_HOME=/tmp/gham-smoke node bin/gham.js help && GHAM_HOME=/tmp/gham-smoke node bin/gham.js model list && GHAM_HOME=/tmp/gham-smoke node bin/gham.js data path",
@@ -23,6 +29,14 @@
     "cli"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/gavin7758521/github-ai-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gavin7758521/github-ai-manager/issues"
+  },
+  "homepage": "https://github.com/gavin7758521/github-ai-manager#readme",
   "optionalDependencies": {
     "@earendil-works/pi-ai": "^0.80.3"
   },
